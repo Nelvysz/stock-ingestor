@@ -6,9 +6,9 @@ from datetime import date
 from config import *
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.mysql import insert
-import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import create_engine
+from tqdm import tqdm
 
 conn = create_engine(
     url="mysql+pymysql://{0}:{1}@{2}:{3}/{4}".format(
@@ -17,11 +17,13 @@ conn = create_engine(
 )
 
 def fetch_company_symbols() -> pd.DataFrame:
+    print('fetch data from tradingview ...')
     response = requests.post(GLOBAL_SCAN_API_URL, json=GLOBAL_SCAN_API_BODY)
     if response.status_code == 200:
         data = response.json()['data']
         df = pd.DataFrame.from_records(data)
         df[['symbol', 'company', 'exchange']] = df['d'].to_list()
+        print(f'{df.shape[0]} symbols is fetching ...')
         return df[['company', 'symbol']]
     else:
         print(f"Failed to fetch data: {response.status_code}")
@@ -118,7 +120,7 @@ def extract_global_price_multithread(symbol_df: pd.DataFrame) -> pd.DataFrame:
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_symbol = {executor.submit(extract_symbol_price_indicator, symbol,
-                                            max_date_price_df, max_date_indicator_df, conn): symbol for symbol in symbol_list}
+                                            max_date_price_df, max_date_indicator_df, conn): symbol for symbol in tqdm(symbol_list)}
 
         for future in as_completed(future_to_symbol):
             symbol = future_to_symbol[future]
